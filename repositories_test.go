@@ -60,8 +60,8 @@ func TestRepositoryServiceAdd(t *testing.T) {
 	repositoryConfig := &RepositoryConfig{
 		Service:                         "github",
 		Name:                            "user/fakerepo",
-		CommentOnPullRequests:           true,
-		SendBuildStatus:                 false,
+		CommentOnPullRequests:           pbool(true),
+		SendBuildStatus:                 pbool(false),
 		CommitStatusFailThreshold:       &failThreshold,
 		CommitStatusFailChangeThreshold: nil,
 	}
@@ -100,12 +100,12 @@ func TestRepositoryConfigMarshall(t *testing.T) {
 		{
 			name: "simple",
 			in:   RepositoryConfig{Service: "github", Name: "user/fakerepo"},
-			out:  `{"service": "github", "name": "user/fakerepo", "send_build_status": false, "comment_on_pull_requests": false, "commit_status_fail_change_threshold": null, "commit_status_fail_threshold": null}`,
+			out:  `{"service": "github", "name": "user/fakerepo"}`,
 		},
 		{
 			name: "partial",
-			in:   RepositoryConfig{Service: "github", Name: "user/fakerepo", SendBuildStatus: true, CommitStatusFailThreshold: pfloat64(10.3)},
-			out:  `{"service": "github", "name": "user/fakerepo", "send_build_status": true, "comment_on_pull_requests": false, "commit_status_fail_change_threshold": null, "commit_status_fail_threshold": 10.3}`,
+			in:   RepositoryConfig{Service: "github", Name: "user/fakerepo", SendBuildStatus: pbool(true), CommitStatusFailThreshold: pfloat64(10.3)},
+			out:  `{"service": "github", "name": "user/fakerepo", "send_build_status": true, "commit_status_fail_threshold": 10.3}`,
 		},
 	}
 
@@ -132,4 +132,8 @@ func ExampleRepositoryService_Get() {
 
 func pfloat64(v float64) *float64 {
 	return &v
+}
+
+func pbool(b bool) *bool {
+	return &b
 }
