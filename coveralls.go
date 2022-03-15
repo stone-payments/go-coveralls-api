@@ -42,7 +42,7 @@ type Client struct {
 	// Host URL for Coveralls. Defaults to https://coveralls.io
 	// Change this if you want to use private Coveralls server (untested)
 	HostURL      *url.URL
-	Repositories *RepositoryService // Service to interact with repository-related endpoints
+	Repositories RepositoryService // Service to interact with repository-related endpoints
 }
 
 type service struct {
@@ -59,7 +59,6 @@ func NewClient(t string) *Client {
 	url, _ := url.Parse(defaultHostURL)
 	c := &Client{client: cli, HostURL: url}
 	c.common.client = c
-
-	c.Repositories = (*RepositoryService)(&c.common)
+	c.Repositories = (*RepositoryServiceImpl)(&c.common)
 	return c
 }

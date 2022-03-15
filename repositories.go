@@ -28,7 +28,14 @@ import (
 )
 
 // RepositoryService holds information to access repository-related endpoints
-type RepositoryService service
+type RepositoryService interface {
+	Get(ctx context.Context, svc string, repo string) (*Repository, error)
+	Add(ctx context.Context, data *RepositoryConfig) (*RepositoryConfig, error)
+	Update(ctx context.Context, svc string, repo string, data *RepositoryConfig) (*RepositoryConfig, error)
+}
+
+// RepositoryServiceImpl holds information to access repository-related endpoints
+type RepositoryServiceImpl service
 
 // Repository holds information about one specific repository
 type Repository struct {
@@ -60,9 +67,9 @@ type RepositoryConfig struct {
 // Repo is the repository name. In GitHub, for example, this is
 // 'organization/repository'; other services could have different formats.
 //
-// If the request suceeded, it returns a Repository with the information
+// If the request succeeded, it returns a Repository with the information
 // available or an error if there was something wrong.
-func (s *RepositoryService) Get(ctx context.Context, svc string, repo string) (*Repository, error) {
+func (s RepositoryServiceImpl) Get(ctx context.Context, svc string, repo string) (*Repository, error) {
 	url := fmt.Sprintf("%s/api/repos/%s/%s", s.client.HostURL, svc, repo)
 
 	resp, err := s.client.client.R().
@@ -78,7 +85,7 @@ func (s *RepositoryService) Get(ctx context.Context, svc string, repo string) (*
 }
 
 // Add a repository to Coveralls
-func (s *RepositoryService) Add(ctx context.Context, data *RepositoryConfig) (*RepositoryConfig, error) {
+func (s RepositoryServiceImpl) Add(ctx context.Context, data *RepositoryConfig) (*RepositoryConfig, error) {
 	url := fmt.Sprintf("%s/api/repos", s.client.HostURL)
 
 	body := map[string]*RepositoryConfig{
@@ -99,7 +106,7 @@ func (s *RepositoryService) Add(ctx context.Context, data *RepositoryConfig) (*R
 }
 
 // Update repository configuration in Coveralls
-func (s *RepositoryService) Update(ctx context.Context, svc string, repo string, data *RepositoryConfig) (*RepositoryConfig, error) {
+func (s RepositoryServiceImpl) Update(ctx context.Context, svc string, repo string, data *RepositoryConfig) (*RepositoryConfig, error) {
 	url := fmt.Sprintf("%s/api/repos/%s/%s", s.client.HostURL, svc, repo)
 
 	body := map[string]*RepositoryConfig{
