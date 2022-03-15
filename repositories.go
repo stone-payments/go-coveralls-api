@@ -24,7 +24,15 @@ package coveralls
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
+)
+
+var (
+	ErrRepoNotFound         = fmt.Errorf("repo was not found (status code %d)", http.StatusNotFound)
+	ErrUnprocessableEntity  = fmt.Errorf("unprocessable entity (status code %d)", http.StatusUnprocessableEntity)
+	ErrUnexpectedStatusCode = errors.New("unexpected status code on response")
 )
 
 // RepositoryService holds information to access repository-related endpoints
@@ -88,7 +96,14 @@ func (s RepositoryServiceImpl) Get(ctx context.Context, svc string, repo string)
 		return nil, err
 	}
 
-	return resp.Result().(*Repository), nil
+	switch resp.StatusCode() {
+	case http.StatusOK:
+		return resp.Result().(*Repository), nil
+	case http.StatusNotFound:
+		return nil, ErrRepoNotFound
+	default:
+		return nil, fmt.Errorf("status code %d: %w", resp.StatusCode(), ErrUnexpectedStatusCode)
+	}
 }
 
 // Add a repository to Coveralls
@@ -109,7 +124,17 @@ func (s RepositoryServiceImpl) Add(ctx context.Context, data *RepositoryConfig) 
 		return nil, err
 	}
 
-	return resp.Result().(*RepositoryConfig), nil
+	switch resp.StatusCode() {
+	case http.StatusCreated:
+		return resp.Result().(*RepositoryConfig), nil
+	case http.StatusUnprocessableEntity:
+		// Ideally we should at least wrap the error json returned by the api here, so our
+		// lib user can see what the server is complaining about. This would be a good enhancement.
+		return nil, ErrUnprocessableEntity
+	default:
+		return nil, fmt.Errorf("status code %d: %w", resp.StatusCode(), ErrUnexpectedStatusCode)
+	}
+
 }
 
 // Update repository configuration in Coveralls
@@ -130,5 +155,14 @@ func (s RepositoryServiceImpl) Update(ctx context.Context, svc string, repo stri
 		return nil, err
 	}
 
-	return resp.Result().(*RepositoryConfig), nil
+	switch resp.StatusCode() {
+	case http.StatusOK:
+		return resp.Result().(*RepositoryConfig), nil
+	case http.StatusUnprocessableEntity:
+		// Ideally we should at least wrap the error json returned by the api here, so our
+		// lib user can see what the server is complaining about. This would be a good enhancement.
+		return nil, ErrUnprocessableEntity
+	default:
+		return nil, fmt.Errorf("status code %d: %w", resp.StatusCode(), ErrUnexpectedStatusCode)
+	}
 }

@@ -25,6 +25,7 @@ package coveralls
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -35,24 +36,60 @@ import (
 )
 
 func TestRepositoryServiceGet(t *testing.T) {
-	repository := &Repository{
-		ID:       123,
-		Name:     "user/fakerepo",
-		HasBadge: true,
-		Token:    "fake-repo-token",
+	var testCases = []struct {
+		name string
+		code int
+		repo *Repository
+		err  error
+	}{
+		{
+			name: "existing",
+			code: http.StatusOK,
+			repo: &Repository{
+				ID:                        123,
+				Service:                   "github",
+				Name:                      "user/fakerepo",
+				SendBuildStatus:           pbool(true),
+				CommitStatusFailThreshold: pfloat64(10.3),
+				HasBadge:                  true,
+				Token:                     "fake-repo-token",
+				CreatedAt:                 "2022-03-15T21:47:57Z",
+				UpdatedAt:                 "2022-03-15T21:47:57Z",
+			},
+			err: nil,
+		},
+		{
+			name: "notfound",
+			code: http.StatusNotFound,
+			repo: nil,
+			err:  ErrRepoNotFound,
+		},
+		{
+			name: "unexpected",
+			code: http.StatusUseProxy,
+			repo: nil,
+			err:  ErrUnexpectedStatusCode,
+		},
 	}
-	responder, _ := httpmock.NewJsonResponder(200, repository)
-	fakeUrl := "https://coveralls.io/api/repos/github/user/fakerepo"
-	httpmock.RegisterResponder("GET", fakeUrl, responder)
 
-	client := NewClient("fake token")
-	httpmock.ActivateNonDefault(client.client.GetClient())
-	defer httpmock.DeactivateAndReset()
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeUrl := "https://coveralls.io/api/repos/github/user/fakerepo"
+			responder, _ := httpmock.NewJsonResponder(tt.code, tt.repo)
+			httpmock.RegisterResponder("GET", fakeUrl, responder)
 
-	result, err := client.Repositories.Get(context.Background(), "github", "user/fakerepo")
+			client := NewClient("fake token")
+			httpmock.ActivateNonDefault(client.client.GetClient())
+			defer httpmock.DeactivateAndReset()
 
-	assert.Nil(t, err)
-	assert.Equal(t, repository, result)
+			result, err := client.Repositories.Get(context.Background(), "github", "user/fakerepo")
+
+			if !errors.Is(err, tt.err) {
+				t.Errorf("Errors do not match.\n\texpected: '%v'\n\tgot: '%v'", tt.err, err)
+			}
+			assert.Equal(t, tt.repo, result)
+		})
+	}
 }
 
 func TestRepositoryServiceAdd(t *testing.T) {
@@ -74,7 +111,7 @@ func TestRepositoryServiceAdd(t *testing.T) {
 
 		assert.Equal(t, repositoryConfig, cfg["repo"])
 
-		resp, err := httpmock.NewJsonResponse(200, cfg["repo"])
+		resp, err := httpmock.NewJsonResponse(201, cfg["repo"])
 		if err != nil {
 			return httpmock.NewStringResponse(500, ""), nil
 		}
