@@ -63,7 +63,7 @@ type RepositoryConfig struct {
 // If the request suceeded, it returns a Repository with the information
 // available or an error if there was something wrong.
 func (s *RepositoryService) Get(ctx context.Context, svc string, repo string) (*Repository, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s", s.client.baseURL, svc, repo)
+	url := fmt.Sprintf("%s/api/repos/%s/%s", s.client.HostURL, svc, repo)
 
 	resp, err := s.client.client.R().
 		SetContext(ctx).
@@ -79,7 +79,7 @@ func (s *RepositoryService) Get(ctx context.Context, svc string, repo string) (*
 
 // Add a repository to Coveralls
 func (s *RepositoryService) Add(ctx context.Context, data *RepositoryConfig) (*RepositoryConfig, error) {
-	url := fmt.Sprintf("%s/repos", s.client.baseURL)
+	url := fmt.Sprintf("%s/api/repos", s.client.HostURL)
 
 	body := map[string]*RepositoryConfig{
 		"repo": data,
@@ -100,7 +100,7 @@ func (s *RepositoryService) Add(ctx context.Context, data *RepositoryConfig) (*R
 
 // Update repository configuration in Coveralls
 func (s *RepositoryService) Update(ctx context.Context, svc string, repo string, data *RepositoryConfig) (*RepositoryConfig, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s", s.client.baseURL, svc, repo)
+	url := fmt.Sprintf("%s/api/repos/%s/%s", s.client.HostURL, svc, repo)
 
 	body := map[string]*RepositoryConfig{
 		"repo": data,

@@ -31,15 +31,17 @@ import (
 )
 
 const (
-	defaultBaseURL = "https://coveralls.io/api"
+	defaultHostURL = "https://coveralls.io"
 )
 
 // Client is used to provide a single interface to interact with Coveralls API
 type Client struct {
-	client  *resty.Client
-	baseURL *url.URL // Base URL for Coveralls API
-	common  service  // Share the same client instance among all services
+	client *resty.Client
+	common service // Share the same client instance among all services
 
+	// Host URL for Coveralls. Defaults to https://coveralls.io
+	// Change this if you want to use private Coveralls server (untested)
+	HostURL      *url.URL
 	Repositories *RepositoryService // Service to interact with repository-related endpoints
 }
 
@@ -54,8 +56,8 @@ func NewClient(t string) *Client {
 	cli.SetHeader("Accept", "application/json")
 	cli.SetHeader("Authorization", fmt.Sprintf("token %s", t))
 
-	url, _ := url.Parse(defaultBaseURL)
-	c := &Client{client: cli, baseURL: url}
+	url, _ := url.Parse(defaultHostURL)
+	c := &Client{client: cli, HostURL: url}
 	c.common.client = c
 
 	c.Repositories = (*RepositoryService)(&c.common)
