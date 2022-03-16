@@ -1,4 +1,4 @@
-module github.com/loadsmart/go-coveralls-api
+module github.com/stone-payments/go-coveralls-api
 
 go 1.13
 
