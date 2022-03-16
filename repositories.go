@@ -30,8 +30,16 @@ import (
 )
 
 var (
-	ErrRepoNotFound         = fmt.Errorf("repo was not found (status code %d)", http.StatusNotFound)
-	ErrUnprocessableEntity  = fmt.Errorf("unprocessable entity (status code %d)", http.StatusUnprocessableEntity)
+	// ErrRepoNotFound is returned by Get() when we receive a 404 Not Found status code
+	ErrRepoNotFound = fmt.Errorf("repo was not found (status code %d)", http.StatusNotFound)
+
+	// ErrUnprocessableEntity is returned by Add() when the repo already exists,
+	// or there is some error in the RepositoryConfig spec.
+	// It may be returned by the API on other cases, we suppose, or by Update().
+	ErrUnprocessableEntity = fmt.Errorf("unprocessable entity (status code %d)", http.StatusUnprocessableEntity)
+
+	// ErrUnexpectedStatusCode is returned by Get(), Add() or Update() when we get an
+	// unpexpected status code from the API
 	ErrUnexpectedStatusCode = errors.New("unexpected status code on response")
 )
 
