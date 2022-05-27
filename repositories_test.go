@@ -68,7 +68,10 @@ func TestRepositoryServiceGet(t *testing.T) {
 			name: "unexpected",
 			code: http.StatusUseProxy,
 			repo: nil,
-			err:  ErrUnexpectedStatusCode,
+			err: ErrUnexpectedStatusCode{
+				StatusCode: http.StatusUseProxy,
+				ErrorBody:  "null",
+			},
 		},
 	}
 
@@ -126,6 +129,36 @@ func TestRepositoryServiceAdd(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Equal(t, repositoryConfig, result)
+}
+
+func TestRepositoryServiceAddDuplicateError(t *testing.T) {
+	repositoryConfig := &RepositoryConfig{
+		Service: "github",
+		Name:    "user/fake-duplicate-repo",
+	}
+	fakeUrl := "https://coveralls.io/api/repos"
+	httpmock.RegisterResponder("POST", fakeUrl, func(req *http.Request) (*http.Response, error) {
+		errorNameTaken := map[string]map[string]string{
+			"errors": {
+				"name": "has already been taken",
+			},
+		}
+
+		resp, err := httpmock.NewJsonResponse(422, errorNameTaken)
+		if err != nil {
+			return httpmock.NewStringResponse(500, ""), nil
+		}
+		return resp, nil
+	})
+
+	client := NewClient("fake token")
+	httpmock.ActivateNonDefault(client.client.GetClient())
+	defer httpmock.DeactivateAndReset()
+
+	result, err := client.Repositories.Add(context.Background(), repositoryConfig)
+
+	assert.Equal(t, err, ErrNameIsTaken)
+	assert.Nil(t, result)
 }
 
 func TestRepositoryConfigMarshall(t *testing.T) {
