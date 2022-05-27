@@ -24,24 +24,57 @@ package coveralls
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 var (
-	// ErrRepoNotFound is returned by Get() when we receive a 404 Not Found status code
+	// ErrRepoNotFound is returned when we receive a 404 Not Found status code
 	ErrRepoNotFound = fmt.Errorf("repo was not found (status code %d)", http.StatusNotFound)
 
-	// ErrUnprocessableEntity is returned by Add() when the repo already exists,
-	// or there is some error in the RepositoryConfig spec.
-	// It may be returned by the API on other cases, we suppose, or by Update().
-	ErrUnprocessableEntity = fmt.Errorf("unprocessable entity (status code %d)", http.StatusUnprocessableEntity)
-
-	// ErrUnexpectedStatusCode is returned by Get(), Add() or Update() when we get an
-	// unpexpected status code from the API
-	ErrUnexpectedStatusCode = errors.New("unexpected status code on response")
+	// ErrNameIsTaken is returned when the API respondes to a POST saying that the repo
+	// name has already been taken. The status code is UnprocessableEntity but we return
+	// this more specific error for convenience.
+	ErrNameIsTaken = fmt.Errorf("unprocessable entity (status code %d): repo name has already been taken", http.StatusUnprocessableEntity)
 )
+
+// ErrUnprocessableEntity is returned when the API returns 422 Unprocessable
+// Entity status code and we don't have identified a more specific error condition.
+//
+// Its error message string includes the full body from the response.
+// That includes some error in the RepositoryConfig spec, but may include other conditions.
+type ErrUnprocessableEntity struct {
+	ErrorBody string
+}
+
+func (e ErrUnprocessableEntity) Error() string {
+	return fmt.Sprintf("unprocessable entity (status code %d). Error body: '%s'", http.StatusUnprocessableEntity, e.ErrorBody)
+}
+
+func newErrUnprocessableEntity(errorBody string) ErrUnprocessableEntity {
+	return ErrUnprocessableEntity{
+		ErrorBody: errorBody,
+	}
+}
+
+// ErrUnexpectedStatusCode is returned when we receive an unexpected status code, not
+// covered by our other sentinel errors.
+type ErrUnexpectedStatusCode struct {
+	StatusCode int
+	ErrorBody  string
+}
+
+func (e ErrUnexpectedStatusCode) Error() string {
+	return fmt.Sprintf("super unexpected status code %d. Error body: '%s'", e.StatusCode, e.ErrorBody)
+}
+
+func newErrUnexpectedStatusCode(c int, b string) ErrUnexpectedStatusCode {
+	return ErrUnexpectedStatusCode{
+		StatusCode: c,
+		ErrorBody:  b,
+	}
+}
 
 // RepositoryService holds information to access repository-related endpoints
 type RepositoryService interface {
@@ -92,6 +125,8 @@ type RepositoryConfig struct {
 //
 // If the request succeeded, it returns a Repository with the information
 // available or an error if there was something wrong.
+//
+// It may return errors ErrRepoNotFound or ErrUnexpectedStatusCode
 func (s RepositoryServiceImpl) Get(ctx context.Context, svc string, repo string) (*Repository, error) {
 	url := fmt.Sprintf("%s/api/repos/%s/%s", s.client.HostURL, svc, repo)
 
@@ -110,11 +145,13 @@ func (s RepositoryServiceImpl) Get(ctx context.Context, svc string, repo string)
 	case http.StatusNotFound:
 		return nil, ErrRepoNotFound
 	default:
-		return nil, fmt.Errorf("status code %d: %w", resp.StatusCode(), ErrUnexpectedStatusCode)
+		return nil, newErrUnexpectedStatusCode(resp.StatusCode(), string(resp.Body()))
 	}
 }
 
 // Add a repository to Coveralls
+//
+// It may return errors ErrNameIsTaken, ErrUnprocessableEntity or ErrUnexpectedStatusCode
 func (s RepositoryServiceImpl) Add(ctx context.Context, data *RepositoryConfig) (*RepositoryConfig, error) {
 	url := fmt.Sprintf("%s/api/repos", s.client.HostURL)
 
@@ -136,16 +173,20 @@ func (s RepositoryServiceImpl) Add(ctx context.Context, data *RepositoryConfig) 
 	case http.StatusCreated:
 		return resp.Result().(*RepositoryConfig), nil
 	case http.StatusUnprocessableEntity:
-		// Ideally we should at least wrap the error json returned by the api here, so our
-		// lib user can see what the server is complaining about. This would be a good enhancement.
-		return nil, ErrUnprocessableEntity
+		errorBody := string(resp.Body())
+		if strings.Contains(errorBody, "has already been taken") {
+			return nil, ErrNameIsTaken
+		}
+		return nil, newErrUnprocessableEntity(errorBody)
 	default:
-		return nil, fmt.Errorf("status code %d: %w", resp.StatusCode(), ErrUnexpectedStatusCode)
+		return nil, newErrUnexpectedStatusCode(resp.StatusCode(), string(resp.Body()))
 	}
 
 }
 
 // Update repository configuration in Coveralls
+//
+// It may return errors ErrRepoNotFound, ErrUnprocessableEntity or ErrUnexpectedStatusCode
 func (s RepositoryServiceImpl) Update(ctx context.Context, svc string, repo string, data *RepositoryConfig) (*RepositoryConfig, error) {
 	url := fmt.Sprintf("%s/api/repos/%s/%s", s.client.HostURL, svc, repo)
 
@@ -166,11 +207,11 @@ func (s RepositoryServiceImpl) Update(ctx context.Context, svc string, repo stri
 	switch resp.StatusCode() {
 	case http.StatusOK:
 		return resp.Result().(*RepositoryConfig), nil
+	case http.StatusNotFound:
+		return nil, ErrRepoNotFound
 	case http.StatusUnprocessableEntity:
-		// Ideally we should at least wrap the error json returned by the api here, so our
-		// lib user can see what the server is complaining about. This would be a good enhancement.
-		return nil, ErrUnprocessableEntity
+		return nil, newErrUnprocessableEntity(string(resp.Body()))
 	default:
-		return nil, fmt.Errorf("status code %d: %w", resp.StatusCode(), ErrUnexpectedStatusCode)
+		return nil, newErrUnexpectedStatusCode(resp.StatusCode(), string(resp.Body()))
 	}
 }
